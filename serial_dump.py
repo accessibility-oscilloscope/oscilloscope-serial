@@ -32,12 +32,13 @@ INIT_SEQ: list[list[int]] = [
 ]
 
 if __name__ == "__main__":
-    ser = Serial("/dev/ttyUSB0", 1500000, timeout=1.0)
+    ser = Serial("/dev/ttyUSB1", 1500000, timeout=1.0)
 
     for command in INIT_SEQ:
         ser.write(bytearray(command))
         time.sleep(.1)  # pessimistic init sequence delay
 
+    print("wrote init sequence")
     while True:
         ser.write(bytearray([100, 10]))  # arm trigger and get an event
         result = ser.read(40)
