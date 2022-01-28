@@ -1,36 +1,69 @@
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-const uint8_t init_seq[] = {
-    0,  20,  135, 0,   100, 122, 0,   10,  123, 0,   124, 3,   125, 1,   136,
-    2,  32,  0,   0,   255, 200, 136, 2,   32,  1,   0,   255, 200, 136, 2,
-    33, 0,   0,   255, 200, 136, 2,   33,  1,   0,   255, 200, 136, 2,   32,
-    18, 240, 255, 200, 136, 2,   32,  19,  15,  255, 200, 136, 2,   33,  18,
-    0,  255, 200, 136, 2,   33,  19,  0,   255, 200, 131, 8,   0,   131, 6,
-    16, 131, 4,   36,  131, 5,   36,  131, 1,   0,   136, 3,   96,  80,  136,
-    22, 0,   136, 3,   96,  82,  136, 22,  0,   136, 3,   96,  84,  136, 22,
-    0,  136, 3,   96,  86,  136, 22,  0};
+const uint8_t INIT_SEQ[] = {
+    0,   20,                         // board ID 0
+    135, 0,  100,                    // serial delay of 100
+    122, 0,  10,                     // 10 samples per packet
+    123, 0,                          // increment
+    124, 3,                          // downsample 3
+    125, 1,                          // 1 tick wait
+    136, 2,  32,  0,  0,   255, 200, // io expander on
+    136, 2,  32,  1,  0,   255, 200, //  io expander on
+    136, 2,  33,  0,  0,   255, 200, // io expander on
+    136, 2,  33,  1,  0,   255, 200, // io expander on
+    136, 2,  32,  18, 240, 255, 200, // init
+    136, 2,  32,  19, 15,  255, 200, // init ADC
+    136, 2,  33,  18, 0,   255, 200, // init
+    136, 2,  33,  19, 0,   255, 200, // init
+    131, 8,  0,                      // ADC offset
+    131, 6,  16,                     // binary offset
+    131, 4,  36,                     // 300Ohm termination A
+    131, 5,  36,                     // 300Ohm termination B
+    131, 1,  0,                      // disable multiplexing
+    136, 3,  96,  80, 136, 22,  0,   // channel 0 calibration
+    136, 3,  96,  82, 136, 22,  0,   // channel 1 calibration
+    136, 3,  96,  84, 136, 22,  0,   // channel 2 calibration
+    136, 3,  96,  86, 136, 22,  0};  // channel 3 calibration
 
-const uint8_t sample_seq[] = {100, 10};
+const uint8_t SAMPLE_SEQ[] = {100, 10};
 
 int main(int ac, char *av[]) {
-  int fd = open("/dev/ttyUSB1", O_SYNC | O_RDWR);
+  assert(ac == 2 && "usage: serial_dump $TTY");
+  int fd = open(av[1], O_SYNC | O_RDWR);
 
-  for (int ii = 0; ii < sizeof(init_seq); ii++) {
-    int w = write(fd, &init_seq[ii], 1);
-    assert(w == 1);
+  if (fd < 0) {
+    switch (errno) {
+    case EACCES:
+      fprintf(stderr, "bad access of $TTY\n");
+      break;
+    case ENOENT:
+      fprintf(stderr, "$TTY does not exist\n");
+      break;
+    default:
+      fprintf(stderr, "errno %d\n", errno);
+      break;
+    }
+    exit(errno);
+  }
+
+  for (int ii = 0; ii < sizeof(INIT_SEQ); ii++) {
+    int w = write(fd, &INIT_SEQ[ii], 1);
+    assert(w == 1 && "failed to open $TTY");
     usleep(10000); // config settle time
   }
   printf("init sequence wrote\n");
 
   for (;;) {
-    int w = write(fd, sample_seq, sizeof(sample_seq));
-    assert(w == 2);
+    int w = write(fd, SAMPLE_SEQ, sizeof(SAMPLE_SEQ));
+    assert(w == 2 && "failed to request sample");
 
-    usleep(10000); // sample acquisition time
+    usleep(100000); // sample acquisition time
 
     uint8_t read_buf[40];
     int r = read(fd, read_buf, sizeof(read_buf));
@@ -40,6 +73,8 @@ int main(int ac, char *av[]) {
     }
     printf("\n");
   }
+
+  close(fd);
 
   return 0;
 }
