@@ -55,7 +55,7 @@ int main(int ac, char *av[]) {
   for (long unsigned int ii = 0; ii < sizeof(INIT_SEQ); ii++) {
     int w = write(fd, &INIT_SEQ[ii], 1);
     assert(w == 1 && "failed to open $TTY");
-    usleep(100000); // config settle time
+    usleep(10000); // config settle time
   }
   printf("init sequence wrote\n");
 
